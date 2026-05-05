@@ -1,5 +1,4 @@
 import os
-import shutil
 import streamlit as st
 import openai
 
@@ -32,12 +31,6 @@ if "retriever" not in st.session_state:
 
 
 # -----------------------
-# Create folders
-# -----------------------
-os.makedirs("uploads", exist_ok=True)
-
-
-# -----------------------
 # Upload PDF
 # -----------------------
 uploaded_file = st.file_uploader("Choose PDF File", type=["pdf"])
@@ -48,7 +41,7 @@ uploaded_file = st.file_uploader("Choose PDF File", type=["pdf"])
 # -----------------------
 if uploaded_file:
 
-    filepath = os.path.join("uploads", uploaded_file.name)
+    filepath = uploaded_file.name
 
     with open(filepath, "wb") as f:
         f.write(uploaded_file.getbuffer())
@@ -57,10 +50,6 @@ if uploaded_file:
 
     with st.spinner("Processing document..."):
         try:
-            # 🔥 CLEAR OLD VECTOR DATABASE
-            if os.path.exists("chroma_db"):
-                shutil.rmtree("chroma_db")
-
             loader = PyPDFLoader(filepath)
             docs = loader.load()
 
@@ -75,10 +64,10 @@ if uploaded_file:
                 model_name="sentence-transformers/all-mpnet-base-v2"
             )
 
+            # ✅ FIX: No persist_directory (in-memory DB)
             vectordb = Chroma.from_documents(
                 chunks,
-                embedding=embeddings,
-                persist_directory="chroma_db"
+                embedding=embeddings
             )
 
             # Store retriever in session
@@ -131,7 +120,7 @@ Question:
 {question}
 """
 
-            # OpenAI API call
+            # OpenAI call
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}]
@@ -139,7 +128,7 @@ Question:
 
             answer = response["choices"][0]["message"]["content"]
 
-            # Display answer
+            # Show answer
             st.subheader("Answer")
             st.write(answer)
 
