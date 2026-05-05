@@ -24,6 +24,13 @@ st.write("Upload a PDF and ask questions from the document")
 
 
 # -----------------------
+# Session State Init
+# -----------------------
+if "retriever" not in st.session_state:
+    st.session_state.retriever = None
+
+
+# -----------------------
 # Create folders
 # -----------------------
 os.makedirs("uploads", exist_ok=True)
@@ -37,7 +44,7 @@ uploaded_file = st.file_uploader("Choose PDF File", type=["pdf"])
 
 
 # -----------------------
-# Process document
+# Process Document
 # -----------------------
 if uploaded_file:
 
@@ -70,13 +77,13 @@ if uploaded_file:
                 persist_directory="chroma_db"
             )
 
-            # Store retriever in session
+            # ✅ Store retriever in session
             st.session_state.retriever = vectordb.as_retriever()
 
             st.success("Document processed successfully")
 
         except Exception as e:
-            st.error(str(e))
+            st.error(f"Error: {str(e)}")
 
 
 # -----------------------
@@ -89,17 +96,16 @@ if st.button("Ask"):
     if not question:
         st.warning("Please enter a question")
 
-    else:
-        if "retriever" not in st.session_state:
-            st.warning("Please upload a document first")
-            st.stop()
+    elif st.session_state.retriever is None:
+        st.warning("Please upload a document first")
 
+    else:
         try:
             docs = st.session_state.retriever.invoke(question)
 
-            context = "\n".join([d.page_content for d in docs])
+            context = "\n".join([doc.page_content for doc in docs])
 
-            # Show retrieved context
+            # Show retrieved chunks
             st.subheader("Retrieved Context (Sources)")
             for i, doc in enumerate(docs):
                 with st.expander(f"Source {i+1}"):
@@ -121,7 +127,7 @@ Question:
 {question}
 """
 
-            # OpenAI call
+            # OpenAI API call
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}]
@@ -129,7 +135,7 @@ Question:
 
             answer = response["choices"][0]["message"]["content"]
 
-            # Show answer
+            # Display answer
             st.subheader("Answer")
             st.write(answer)
 
