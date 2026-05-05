@@ -1,4 +1,5 @@
 import os
+import shutil
 import streamlit as st
 import openai
 
@@ -34,7 +35,6 @@ if "retriever" not in st.session_state:
 # Create folders
 # -----------------------
 os.makedirs("uploads", exist_ok=True)
-os.makedirs("chroma_db", exist_ok=True)
 
 
 # -----------------------
@@ -57,6 +57,10 @@ if uploaded_file:
 
     with st.spinner("Processing document..."):
         try:
+            # 🔥 CLEAR OLD VECTOR DATABASE
+            if os.path.exists("chroma_db"):
+                shutil.rmtree("chroma_db")
+
             loader = PyPDFLoader(filepath)
             docs = loader.load()
 
@@ -77,7 +81,7 @@ if uploaded_file:
                 persist_directory="chroma_db"
             )
 
-            # ✅ Store retriever in session
+            # Store retriever in session
             st.session_state.retriever = vectordb.as_retriever()
 
             st.success("Document processed successfully")
