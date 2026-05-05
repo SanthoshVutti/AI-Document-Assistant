@@ -11,95 +11,58 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 # -----------------------
 # API KEY
 # -----------------------
-
-
-openai.api_key =  os.getenv("OPENAI_API_KEY")
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 # -----------------------
 # Streamlit UI
 # -----------------------
+st.set_page_config(page_title="AI Document Assistant", layout="centered")
 
-st.set_page_config(
-    page_title="AI Document Assistant",
-    layout="centered"
-)
-
-st.title(
-    "AI-Powered Document Assistant"
-)
-
-st.write(
-"Upload a PDF and ask questions from the document"
-)
+st.title("AI-Powered Document Assistant")
+st.write("Upload a PDF and ask questions from the document")
 
 
-os.makedirs(
-"uploads",
-exist_ok=True
-)
-
-os.makedirs(
-"chroma_db",
-exist_ok=True
-)
+# -----------------------
+# Create folders
+# -----------------------
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("chroma_db", exist_ok=True)
 
 
-uploaded_file = st.file_uploader(
-"Choose PDF File",
-type=["pdf"]
-)
+# -----------------------
+# Upload PDF
+# -----------------------
+uploaded_file = st.file_uploader("Choose PDF File", type=["pdf"])
 
 
+# -----------------------
+# Process document
+# -----------------------
 if uploaded_file:
 
-    filepath = os.path.join(
-        "uploads",
-        uploaded_file.name
-    )
+    filepath = os.path.join("uploads", uploaded_file.name)
 
-    with open(
-        filepath,
-        "wb"
-    ) as f:
+    with open(filepath, "wb") as f:
+        f.write(uploaded_file.getbuffer())
 
-        f.write(
-            uploaded_file.getbuffer()
-        )
+    st.success("Document uploaded successfully")
 
-
-    st.success(
-        "Document uploaded successfully"
-    )
-
-
-    with st.spinner(
-        "Processing document..."
-    ):
-
+    with st.spinner("Processing document..."):
         try:
-
-            loader = PyPDFLoader(
-                filepath
-            )
-
+            loader = PyPDFLoader(filepath)
             docs = loader.load()
-
 
             splitter = RecursiveCharacterTextSplitter(
                 chunk_size=1000,
                 chunk_overlap=200
             )
 
-            chunks = splitter.split_documents(
-                docs
-            )
-
+            chunks = splitter.split_documents(docs)
 
             embeddings = HuggingFaceEmbeddings(
-                 model_name="sentence-transformers/all-mpnet-base-v2"
+                model_name="sentence-transformers/all-mpnet-base-v2"
             )
-
 
             vectordb = Chroma.from_documents(
                 chunks,
@@ -107,92 +70,68 @@ if uploaded_file:
                 persist_directory="chroma_db"
             )
 
-
+            # Store retriever in session
             st.session_state.retriever = vectordb.as_retriever()
 
-            st.success(
-                "Document processed successfully"
-            )
+            st.success("Document processed successfully")
 
         except Exception as e:
+            st.error(str(e))
 
-            st.error(
-                str(e)
+
+# -----------------------
+# Ask Question
+# -----------------------
+question = st.text_input("Ask a question from document:")
+
+if st.button("Ask"):
+
+    if not question:
+        st.warning("Please enter a question")
+
+    else:
+        if "retriever" not in st.session_state:
+            st.warning("Please upload a document first")
+            st.stop()
+
+        try:
+            docs = st.session_state.retriever.invoke(question)
+
+            context = "\n".join([d.page_content for d in docs])
+
+            # Show retrieved context
+            st.subheader("Retrieved Context (Sources)")
+            for i, doc in enumerate(docs):
+                with st.expander(f"Source {i+1}"):
+                    st.write(doc.page_content)
+
+            # Prompt
+            prompt = f"""
+You are an AI assistant answering questions from a document.
+
+Rules:
+- Answer only from context
+- If answer not found, say "Not found in document"
+- Be clear and concise
+
+Context:
+{context}
+
+Question:
+{question}
+"""
+
+            # OpenAI call
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}]
             )
 
+            answer = response["choices"][0]["message"]["content"]
 
-    question = st.text_input(
-        "Ask a question from document:"
-    )
+            # Show answer
+            st.subheader("Answer")
+            st.write(answer)
 
-
-    if st.button("Ask"):
-        if not question:
-            st.warning("Please enter a question")
-        else:
-
-        # ✅ ADD THIS CHECK HERE
-            if "retriever" not in st.session_state:
-                st.warning("Please upload a document first")
-                st.stop()
-
-            try:
-                
-                docs = st.session_state.retriever.invoke(question)
-
-                context = "\n".join([d.page_content for d in docs])
-    st.subheader("Retrieved Context (Sources)")
-    for doc in docs:
-        st.write(doc.page_content[:200])
-
-
-    prompt = f"""
-            You are an AI assistant answering questions from a document.
-
-           Rules:
-            - Answer only from context
-            - If answer not found, say "Not found in document"
-            - Be clear and concise
-
-           Context:
-           {context}
-
-            Question:
-            {question}
-            """
-
-
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {
-                            "role":"user",
-                            "content":prompt
-                        }
-                    ]
-                )
-
-
-                answer = response[
-                    "choices"
-                ][0][
-                    "message"
-                ][
-                    "content"
-                ]
-
-
-                st.subheader(
-                    "Answer"
-                )
-
-                st.write(
-                    answer
-                )
-
-
-            except Exception as e:
-
-                st.error(
-                    str(e)
-                )
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
