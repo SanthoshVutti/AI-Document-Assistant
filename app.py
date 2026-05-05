@@ -127,45 +127,39 @@ if uploaded_file:
 
 
     if st.button("Ask"):
-
         if not question:
-
-            st.warning(
-                "Please enter a question"
-            )
-
+            st.warning("Please enter a question")
         else:
 
+        # ✅ ADD THIS CHECK HERE
+            if "retriever" not in st.session_state:
+                st.warning("Please upload a document first")
+                st.stop()
+
             try:
-
-                docs = retriever.invoke(question)
                 
+                docs = st.session_state.retriever.invoke(question)
 
-                context = "\n".join(
-                    [
-                        d.page_content
-                        for d in docs
-                    ]
-                )
-                st.subheader("Retrieved Context (Sources)")
-                for doc in docs:
-                     st.write(doc.page_content[:200])
+                context = "\n".join([d.page_content for d in docs])
+    st.subheader("Retrieved Context (Sources)")
+    for doc in docs:
+        st.write(doc.page_content[:200])
 
 
-                prompt = f"""
-You are an AI assistant answering questions from a document.
+    prompt = f"""
+            You are an AI assistant answering questions from a document.
 
-Rules:
-- Answer only from context
-- If answer not found, say "Not found in document"
-- Be clear and concise
+           Rules:
+            - Answer only from context
+            - If answer not found, say "Not found in document"
+            - Be clear and concise
 
-Context:
-{context}
+           Context:
+           {context}
 
-Question:
-{question}
-"""
+            Question:
+            {question}
+            """
 
 
                 response = openai.ChatCompletion.create(
