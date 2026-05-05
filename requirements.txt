@@ -12,3 +12,5 @@ onnxruntime==1.24.4
 sentence-transformers
 pypdf
 numpy==1.26.4
+cryptography
+protobuf==3.20.3
