@@ -108,7 +108,7 @@ if uploaded_file:
             )
 
 
-            retriever = vectordb.as_retriever()
+            st.session_state.retriever = vectordb.as_retriever()
 
             st.success(
                 "Document processed successfully"
